@@ -74,6 +74,24 @@ export const initialData: BoardData = {
 const isColumnId = (columns: Column[], id: string) =>
   columns.some((column) => column.id === id);
 
+export const moveColumn = (
+  columns: Column[],
+  activeId: string,
+  overId: string
+): Column[] => {
+  const activeIndex = columns.findIndex((column) => column.id === activeId);
+  const overIndex = columns.findIndex((column) => column.id === overId);
+
+  if (activeIndex === -1 || overIndex === -1 || activeIndex === overIndex) {
+    return columns;
+  }
+
+  const nextColumns = [...columns];
+  const [activeColumn] = nextColumns.splice(activeIndex, 1);
+  nextColumns.splice(overIndex, 0, activeColumn);
+  return nextColumns;
+};
+
 const findColumnId = (columns: Column[], id: string) => {
   if (isColumnId(columns, id)) {
     return id;

@@ -11,15 +11,15 @@ export default defineConfig({
     trace: "retain-on-failure",
   },
   webServer: {
-    command: "npm run dev -- --hostname 127.0.0.1 --port 3000",
+    command: "python ../scripts/run-playwright-server.py",
     url: "http://127.0.0.1:3000",
-    reuseExistingServer: true,
+    reuseExistingServer: false,
     timeout: 120_000,
   },
   projects: [
     {
-      name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
+      name: "chrome",
+      use: { ...devices["Desktop Chrome"], channel: "chrome" },
     },
   ],
 });

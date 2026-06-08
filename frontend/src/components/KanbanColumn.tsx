@@ -1,6 +1,6 @@
 import clsx from "clsx";
-import { useDroppable } from "@dnd-kit/core";
-import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { useSortable, SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import type { Card, Column } from "@/lib/kanban";
 import { KanbanCard } from "@/components/KanbanCard";
 import { NewCardForm } from "@/components/NewCardForm";
@@ -11,6 +11,7 @@ type KanbanColumnProps = {
   onRename: (columnId: string, title: string) => void;
   onAddCard: (columnId: string, title: string, details: string) => void;
   onDeleteCard: (columnId: string, cardId: string) => void;
+  onUpdateCard: (cardId: string, title: string, details: string) => void;
 };
 
 export const KanbanColumn = ({
@@ -19,15 +20,31 @@ export const KanbanColumn = ({
   onRename,
   onAddCard,
   onDeleteCard,
+  onUpdateCard,
 }: KanbanColumnProps) => {
-  const { setNodeRef, isOver } = useDroppable({ id: column.id });
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+    isOver,
+  } = useSortable({ id: column.id, data: { type: "column" } });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
 
   return (
     <section
       ref={setNodeRef}
+      style={style}
       className={clsx(
         "flex min-h-[520px] flex-col rounded-3xl border border-[var(--stroke)] bg-[var(--surface-strong)] p-4 shadow-[var(--shadow)] transition",
-        isOver && "ring-2 ring-[var(--accent-yellow)]"
+        isOver && "ring-2 ring-[var(--accent-yellow)]",
+        isDragging && "z-10 shadow-[0_22px_44px_rgba(3,33,71,0.16)]"
       )}
       data-testid={`column-${column.id}`}
     >
@@ -46,6 +63,15 @@ export const KanbanColumn = ({
             aria-label="Column title"
           />
         </div>
+        <button
+          type="button"
+          className="rounded-full border border-[var(--stroke)] px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--gray-text)] transition hover:border-[var(--primary-blue)] hover:text-[var(--primary-blue)]"
+          aria-label={`Reorder ${column.title}`}
+          {...attributes}
+          {...listeners}
+        >
+          Move
+        </button>
       </div>
       <div className="mt-4 flex flex-1 flex-col gap-3">
         <SortableContext items={column.cardIds} strategy={verticalListSortingStrategy}>
@@ -54,6 +80,7 @@ export const KanbanColumn = ({
               key={card.id}
               card={card}
               onDelete={(cardId) => onDeleteCard(column.id, cardId)}
+              onUpdate={onUpdateCard}
             />
           ))}
         </SortableContext>

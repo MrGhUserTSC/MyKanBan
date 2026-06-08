@@ -1,4 +1,4 @@
-import { moveCard, type Column } from "@/lib/kanban";
+import { moveCard, moveColumn, type Column } from "@/lib/kanban";
 
 describe("moveCard", () => {
   const baseColumns: Column[] = [
@@ -21,5 +21,22 @@ describe("moveCard", () => {
     const result = moveCard(baseColumns, "card-1", "col-b");
     expect(result[0].cardIds).toEqual(["card-2"]);
     expect(result[1].cardIds).toEqual(["card-3", "card-1"]);
+  });
+});
+
+describe("moveColumn", () => {
+  const columns: Column[] = [
+    { id: "col-a", title: "A", cardIds: [] },
+    { id: "col-b", title: "B", cardIds: [] },
+    { id: "col-c", title: "C", cardIds: [] },
+  ];
+
+  it("reorders columns", () => {
+    const result = moveColumn(columns, "col-c", "col-a");
+    expect(result.map((column) => column.id)).toEqual([
+      "col-c",
+      "col-a",
+      "col-b",
+    ]);
   });
 });
