@@ -18,6 +18,8 @@ import {
 } from "@dnd-kit/sortable";
 import { KanbanColumn } from "@/components/KanbanColumn";
 import { KanbanCardPreview } from "@/components/KanbanCardPreview";
+import { BoardSwitcher } from "@/components/BoardSwitcher";
+import type { BoardSummary } from "@/lib/api";
 import {
   AlertIcon,
   CheckIcon,
@@ -41,6 +43,12 @@ type KanbanBoardProps = {
   saveError?: string | null;
   saveStatus?: "idle" | "saving" | "error";
   username?: string;
+  boards?: BoardSummary[];
+  activeBoardId?: number | null;
+  onSelectBoard?: (boardId: number) => void;
+  onCreateBoard?: (name: string) => void;
+  onRenameBoard?: (boardId: number, name: string) => void;
+  onDeleteBoard?: (boardId: number) => void;
 };
 
 export const KanbanBoard = ({
@@ -50,6 +58,12 @@ export const KanbanBoard = ({
   saveError,
   saveStatus = "idle",
   username = "user",
+  boards,
+  activeBoardId = null,
+  onSelectBoard,
+  onCreateBoard,
+  onRenameBoard,
+  onDeleteBoard,
 }: KanbanBoardProps) => {
   const [board, setBoard] = useState<BoardData>(() => initialBoard ?? initialData);
   const [activeItem, setActiveItem] = useState<{
@@ -228,6 +242,19 @@ export const KanbanBoard = ({
               </button>
             ) : null}
           </div>
+
+          {boards && boards.length > 0 && onSelectBoard ? (
+            <div className="flex w-full items-center gap-3 border-t border-[var(--stroke)] pt-4">
+              <BoardSwitcher
+                boards={boards}
+                activeBoardId={activeBoardId}
+                onSelect={onSelectBoard}
+                onCreate={(name) => onCreateBoard?.(name)}
+                onRename={(id, name) => onRenameBoard?.(id, name)}
+                onDelete={(id) => onDeleteBoard?.(id)}
+              />
+            </div>
+          ) : null}
         </header>
 
         <DndContext

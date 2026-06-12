@@ -5,11 +5,27 @@ import { AIChatSidebar, type ChatMessage } from "@/components/AIChatSidebar";
 import { KanbanBoard } from "@/components/KanbanBoard";
 import { LayoutIcon, SpinnerIcon } from "@/components/icons";
 import type { BoardData } from "@/lib/kanban";
+import {
+  type BoardSummary,
+  createBoard,
+  deleteBoard,
+  fetchBoard,
+  fetchSession,
+  listBoards,
+  login,
+  logout,
+  register,
+  renameBoard,
+  saveBoard,
+  sendChat,
+} from "@/lib/api";
 
 type AuthState =
   | { status: "loading" }
   | { status: "unauthenticated"; error: string | null }
   | { status: "authenticated"; username: string };
+
+type AuthMode = "login" | "register";
 
 type SaveState = {
   message: string | null;
@@ -21,34 +37,11 @@ const BOARD_SAVE_DEBOUNCE_MS = 400;
 const createMessageId = () =>
   `msg-${Math.random().toString(36).slice(2, 8)}${Date.now().toString(36)}`;
 
-const sessionRequest = async () => {
-  const response = await fetch("/api/session", {
-    method: "GET",
-    cache: "no-store",
-  });
-
-  if (!response.ok) {
-    throw new Error("Authentication required.");
-  }
-
-  return (await response.json()) as { username: string };
-};
-
-const boardRequest = async () => {
-  const response = await fetch("/api/board", {
-    method: "GET",
-    cache: "no-store",
-  });
-
-  if (!response.ok) {
-    throw new Error("Unable to load your board.");
-  }
-
-  return (await response.json()) as BoardData;
-};
-
 export const AppShell = () => {
   const [authState, setAuthState] = useState<AuthState>({ status: "loading" });
+  const [authMode, setAuthMode] = useState<AuthMode>("login");
+  const [boards, setBoards] = useState<BoardSummary[]>([]);
+  const [activeBoardId, setActiveBoardId] = useState<number | null>(null);
   const [board, setBoard] = useState<BoardData | null>(null);
   const [boardError, setBoardError] = useState<string | null>(null);
   const [chatError, setChatError] = useState<string | null>(null);
@@ -69,7 +62,7 @@ export const AppShell = () => {
 
     const loadSession = async () => {
       try {
-        const session = await sessionRequest();
+        const session = await fetchSession();
         if (!cancelled) {
           setAuthState({ status: "authenticated", username: session.username });
         }
@@ -80,31 +73,69 @@ export const AppShell = () => {
       }
     };
 
-    loadSession();
+    void loadSession();
 
     return () => {
       cancelled = true;
     };
   }, []);
 
+  // Load the list of boards once the user is authenticated.
   useEffect(() => {
+    if (authState.status !== "authenticated") {
+      setBoards([]);
+      setActiveBoardId(null);
+      setBoard(null);
+      setBoardError(null);
+      setChatError(null);
+      setChatMessages([]);
+      setSaveState({ status: "idle", message: null });
+      return;
+    }
+
     let cancelled = false;
 
-    const loadBoard = async () => {
-      if (authState.status !== "authenticated") {
-        setBoard(null);
-        setBoardError(null);
-        setChatError(null);
-        setChatMessages([]);
-        setSaveState({ status: "idle", message: null });
-        return;
-      }
-
-      setIsBoardLoading(true);
-      setBoardError(null);
-
+    const loadBoards = async () => {
       try {
-        const nextBoard = await boardRequest();
+        const summaries = await listBoards();
+        if (cancelled) {
+          return;
+        }
+        setBoards(summaries);
+        setActiveBoardId((current) =>
+          current && summaries.some((board) => board.id === current)
+            ? current
+            : (summaries[0]?.id ?? null)
+        );
+      } catch (error) {
+        if (!cancelled) {
+          setBoardError(
+            error instanceof Error ? error.message : "Unable to load your boards."
+          );
+        }
+      }
+    };
+
+    void loadBoards();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authState]);
+
+  // Load the active board's content whenever the selection changes.
+  useEffect(() => {
+    if (authState.status !== "authenticated" || activeBoardId === null) {
+      return;
+    }
+
+    let cancelled = false;
+    setIsBoardLoading(true);
+    setBoardError(null);
+
+    const loadBoard = async () => {
+      try {
+        const nextBoard = await fetchBoard(activeBoardId);
         if (!cancelled) {
           setBoard(nextBoard);
           setSaveState({ status: "idle", message: null });
@@ -112,9 +143,7 @@ export const AppShell = () => {
       } catch (error) {
         if (!cancelled) {
           setBoardError(
-            error instanceof Error
-              ? error.message
-              : "Unable to load your board."
+            error instanceof Error ? error.message : "Unable to load your board."
           );
         }
       } finally {
@@ -129,31 +158,21 @@ export const AppShell = () => {
     return () => {
       cancelled = true;
     };
-  }, [authState]);
+  }, [authState, activeBoardId]);
 
-  const handleLogin = async (event: FormEvent<HTMLFormElement>) => {
+  const handleAuthSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsSubmitting(true);
     const form = event.currentTarget;
-
     const formData = new FormData(form);
     const username = String(formData.get("username") ?? "");
     const password = String(formData.get("password") ?? "");
 
     try {
-      const response = await fetch("/api/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ username, password }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Use username \"user\" and password \"password\".");
-      }
-
-      const session = (await response.json()) as { username: string };
+      const session =
+        authMode === "register"
+          ? await register(username, password)
+          : await login(username, password);
       setAuthState({ status: "authenticated", username: session.username });
       form.reset();
     } catch (error) {
@@ -162,18 +181,14 @@ export const AppShell = () => {
         error:
           error instanceof Error
             ? error.message
-            : "Login failed. Try again.",
+            : "Something went wrong. Try again.",
       });
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleLogout = async () => {
-    await fetch("/api/logout", {
-      method: "POST",
-    });
-
+  const resetClientState = () => {
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
       saveTimeoutRef.current = null;
@@ -181,31 +196,27 @@ export const AppShell = () => {
     pendingSavesRef.current = 0;
     saveQueueRef.current = Promise.resolve();
     setBoard(null);
+    setBoards([]);
+    setActiveBoardId(null);
     setBoardError(null);
     setChatError(null);
     setChatMessages([]);
     setSaveState({ status: "idle", message: null });
+  };
+
+  const handleLogout = async () => {
+    await logout();
+    resetClientState();
+    setAuthMode("login");
     setAuthState({ status: "unauthenticated", error: null });
   };
 
-  const queueBoardSave = (nextBoard: BoardData) => {
+  const queueBoardSave = (boardId: number, nextBoard: BoardData) => {
     pendingSavesRef.current += 1;
 
     saveQueueRef.current = saveQueueRef.current
       .catch(() => undefined)
-      .then(async () => {
-        const response = await fetch("/api/board", {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(nextBoard),
-        });
-
-        if (!response.ok) {
-          throw new Error("Unable to save your board.");
-        }
-      })
+      .then(() => saveBoard(boardId, nextBoard))
       .then(() => {
         pendingSavesRef.current -= 1;
         if (pendingSavesRef.current === 0) {
@@ -217,14 +228,16 @@ export const AppShell = () => {
         setSaveState({
           status: "error",
           message:
-            error instanceof Error
-              ? error.message
-              : "Unable to save your board.",
+            error instanceof Error ? error.message : "Unable to save your board.",
         });
       });
   };
 
   const handleBoardChange = (nextBoard: BoardData) => {
+    if (activeBoardId === null) {
+      return;
+    }
+    const boardId = activeBoardId;
     setBoard(nextBoard);
     setBoardError(null);
     setSaveState({ status: "saving", message: null });
@@ -234,11 +247,62 @@ export const AppShell = () => {
     }
     saveTimeoutRef.current = setTimeout(() => {
       saveTimeoutRef.current = null;
-      queueBoardSave(nextBoard);
+      queueBoardSave(boardId, nextBoard);
     }, BOARD_SAVE_DEBOUNCE_MS);
   };
 
+  const handleSelectBoard = (boardId: number) => {
+    if (boardId !== activeBoardId) {
+      setActiveBoardId(boardId);
+    }
+  };
+
+  const handleCreateBoard = async (name: string) => {
+    try {
+      const created = await createBoard(name);
+      setBoards((current) => [...current, created]);
+      setActiveBoardId(created.id);
+    } catch (error) {
+      setBoardError(
+        error instanceof Error ? error.message : "Unable to create the board."
+      );
+    }
+  };
+
+  const handleRenameBoard = async (boardId: number, name: string) => {
+    try {
+      const updated = await renameBoard(boardId, name);
+      setBoards((current) =>
+        current.map((board) => (board.id === boardId ? updated : board))
+      );
+    } catch (error) {
+      setBoardError(
+        error instanceof Error ? error.message : "Unable to rename the board."
+      );
+    }
+  };
+
+  const handleDeleteBoard = async (boardId: number) => {
+    try {
+      await deleteBoard(boardId);
+      setBoards((current) => {
+        const remaining = current.filter((board) => board.id !== boardId);
+        if (boardId === activeBoardId) {
+          setActiveBoardId(remaining[0]?.id ?? null);
+        }
+        return remaining;
+      });
+    } catch (error) {
+      setBoardError(
+        error instanceof Error ? error.message : "Unable to delete the board."
+      );
+    }
+  };
+
   const handleSendChatMessage = async (message: string) => {
+    if (activeBoardId === null) {
+      return;
+    }
     const userMessage: ChatMessage = {
       id: createMessageId(),
       role: "user",
@@ -250,37 +314,13 @@ export const AppShell = () => {
     setChatMessages((current) => [...current, userMessage]);
 
     try {
-      const response = await fetch("/api/ai/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ message }),
-      });
-
-      if (!response.ok) {
-        const detail = (await response.json().catch(() => null)) as
-          | { detail?: string }
-          | null;
-        throw new Error(detail?.detail ?? "Unable to send your message.");
-      }
-
-      const payload = (await response.json()) as {
-        reply: string;
-        board: BoardData;
-        updated: boolean;
-      };
-
+      const payload = await sendChat(message, activeBoardId);
       setBoard(payload.board);
       setBoardError(null);
       setSaveState({ status: "idle", message: null });
       setChatMessages((current) => [
         ...current,
-        {
-          id: createMessageId(),
-          role: "assistant",
-          content: payload.reply,
-        },
+        { id: createMessageId(), role: "assistant", content: payload.reply },
       ]);
     } catch (error) {
       setChatError(
@@ -339,6 +379,12 @@ export const AppShell = () => {
             onLogout={handleLogout}
             saveError={saveState.message}
             saveStatus={saveState.status}
+            boards={boards}
+            activeBoardId={activeBoardId}
+            onSelectBoard={handleSelectBoard}
+            onCreateBoard={handleCreateBoard}
+            onRenameBoard={handleRenameBoard}
+            onDeleteBoard={handleDeleteBoard}
           />
           <AIChatSidebar
             error={chatError}
@@ -350,6 +396,8 @@ export const AppShell = () => {
       </div>
     );
   }
+
+  const isRegister = authMode === "register";
 
   return (
     <div className="relative overflow-hidden">
@@ -363,21 +411,25 @@ export const AppShell = () => {
               <LayoutIcon className="h-7 w-7" />
             </span>
             <h1 className="mt-5 font-display text-3xl font-semibold text-[var(--navy-dark)]">
-              Log in to open your Kanban board
+              {isRegister
+                ? "Create your account"
+                : "Log in to open your kanban board"}
             </h1>
             <p className="mt-2 text-sm text-[var(--gray-text)]">
-              Sign in to pick up where you left off.
+              {isRegister
+                ? "Pick a username and password to get your own boards."
+                : "Sign in to pick up where you left off."}
             </p>
           </div>
 
-          <form className="mt-8 space-y-4" onSubmit={handleLogin}>
+          <form className="mt-8 space-y-4" onSubmit={handleAuthSubmit}>
             <label className="block">
               <span className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--gray-text)]">
                 Username
               </span>
               <input
                 name="username"
-                defaultValue="user"
+                defaultValue={isRegister ? "" : "user"}
                 autoComplete="username"
                 className="mt-2 w-full rounded-2xl border border-[var(--stroke)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--navy-dark)] outline-none transition focus:border-[var(--primary-blue)]"
               />
@@ -389,8 +441,8 @@ export const AppShell = () => {
               <input
                 name="password"
                 type="password"
-                defaultValue="password"
-                autoComplete="current-password"
+                defaultValue={isRegister ? "" : "password"}
+                autoComplete={isRegister ? "new-password" : "current-password"}
                 className="mt-2 w-full rounded-2xl border border-[var(--stroke)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--navy-dark)] outline-none transition focus:border-[var(--primary-blue)]"
               />
             </label>
@@ -406,13 +458,36 @@ export const AppShell = () => {
               disabled={isSubmitting}
               className="w-full rounded-full bg-[var(--secondary-purple)] px-5 py-3 text-sm font-semibold uppercase tracking-[0.18em] text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
             >
-              {isSubmitting ? "Signing in..." : "Sign in"}
+              {isSubmitting
+                ? isRegister
+                  ? "Creating account..."
+                  : "Signing in..."
+                : isRegister
+                  ? "Create account"
+                  : "Sign in"}
             </button>
           </form>
 
-          <p className="mt-6 text-center text-xs text-[var(--gray-text)]">
-            Local demo · <span className="font-semibold text-[var(--navy-dark)]">user</span> / <span className="font-semibold text-[var(--navy-dark)]">password</span>
-          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setAuthMode(isRegister ? "login" : "register");
+              setAuthState({ status: "unauthenticated", error: null });
+            }}
+            className="mt-6 w-full text-center text-sm font-semibold text-[var(--primary-blue)] transition hover:brightness-110"
+          >
+            {isRegister
+              ? "Already have an account? Sign in"
+              : "Need an account? Create one"}
+          </button>
+
+          {isRegister ? null : (
+            <p className="mt-4 text-center text-xs text-[var(--gray-text)]">
+              Demo login ·{" "}
+              <span className="font-semibold text-[var(--navy-dark)]">user</span> /{" "}
+              <span className="font-semibold text-[var(--navy-dark)]">password</span>
+            </p>
+          )}
         </section>
       </main>
     </div>

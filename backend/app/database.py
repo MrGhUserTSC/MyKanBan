@@ -166,6 +166,12 @@ def seed_default_data(connection: sqlite3.Connection) -> None:
         """,
         (MVP_USERNAME, hash_password(MVP_PASSWORD), timestamp),
     )
+    # Backfill the demo user's password on databases migrated from the
+    # original single-user schema, where the hash column defaulted to empty.
+    connection.execute(
+        "UPDATE users SET password_hash = ? WHERE username = ? AND password_hash = ''",
+        (hash_password(MVP_PASSWORD), MVP_USERNAME),
+    )
 
     user_row = connection.execute(
         "SELECT id FROM users WHERE username = ?",

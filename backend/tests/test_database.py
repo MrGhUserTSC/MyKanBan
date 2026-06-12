@@ -180,3 +180,38 @@ def test_migration_upgrades_legacy_single_board_schema(tmp_path: Path) -> None:
     assert len(boards) == 1
     assert boards[0]["name"]  # got a name during migration
     assert get_board(path, "legacy", boards[0]["id"]) == DEFAULT_BOARD
+
+
+def test_migration_backfills_demo_user_password(tmp_path: Path) -> None:
+    path = tmp_path / "legacy.db"
+    # Legacy schema seeded the demo "user" with no password column at all.
+    with connect_database(path) as connection:
+        connection.execute(
+            "CREATE TABLE users (id INTEGER PRIMARY KEY, username TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL)"
+        )
+        connection.execute(
+            """
+            CREATE TABLE boards (
+              id INTEGER PRIMARY KEY,
+              user_id INTEGER NOT NULL UNIQUE,
+              board_json TEXT NOT NULL,
+              created_at TEXT NOT NULL,
+              updated_at TEXT NOT NULL,
+              FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+            """
+        )
+        connection.execute(
+            "INSERT INTO users (username, created_at) VALUES (?, ?)",
+            (MVP_USERNAME, "2020-01-01T00:00:00+00:00"),
+        )
+        connection.execute(
+            "INSERT INTO boards (user_id, board_json, created_at, updated_at) VALUES (1, ?, ?, ?)",
+            (json.dumps(DEFAULT_BOARD), "2020-01-01T00:00:00+00:00", "2020-01-01T00:00:00+00:00"),
+        )
+        connection.commit()
+
+    initialize_database(path)
+
+    # The demo user can log in after migration despite having had no password.
+    assert verify_credentials(path, MVP_USERNAME, MVP_PASSWORD) is True

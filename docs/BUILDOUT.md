@@ -36,6 +36,21 @@ Updated each iteration so work is resumable.
 - Backend is now feature-complete. Next: frontend (registration UI +
   multi-board switcher wired to the new endpoints), then richer cards + E2E.
 
+### Iteration 2 (2026-06-12)
+- Done: frontend multi-board + registration.
+  - New lib/api.ts: typed client for session/auth/boards/chat.
+  - New BoardSwitcher component (select + inline create/rename/delete).
+  - AppShell rewritten: loads board list, tracks activeBoardId, loads/saves
+    per-board, board-scoped AI chat, login/register toggle.
+  - KanbanBoard renders the switcher in its header.
+- Tests: frontend unit 14 -> 23 (new BoardSwitcher + AppShell cases).
+  E2E 11 -> 13 (registration + multi-board switching journeys).
+- Migration bug caught by E2E: legacy demo user had an empty password_hash
+  after the column was added (ON CONFLICT DO NOTHING never backfilled it).
+  Fixed in seed_default_data; added a regression test. 60 backend tests green.
+- Full green: 60 backend + 23 frontend unit + 13 E2E.
+- Next: richer card fields (assignee/priority/labels/due date), then polish.
+
 ## Conventions
 
 - Backend tests: `.venv\Scripts\python.exe -m pytest backend -q` with `PYTHONPATH=backend`.
