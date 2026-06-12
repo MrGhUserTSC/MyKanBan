@@ -61,6 +61,7 @@ class ChatMessagePayload(BaseModel):
 
 class AiChatRequest(BaseModel):
     message: str
+    board_id: int | None = None
 
 
 class AiChatStructuredResponse(BaseModel):

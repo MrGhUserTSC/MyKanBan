@@ -29,7 +29,12 @@ Updated each iteration so work is resumable.
   multi-board CRUD (GET/POST /api/boards, GET/PUT/PATCH/DELETE /api/boards/{id}).
 - Refactored auth into a require_user dependency.
 - Found + fixed ownership-vs-last-board ordering bug in delete_board.
-- 57 tests green. Next: board-scoped AI chat + richer card fields, then frontend.
+- 57 tests green.
+- Also done: board-scoped AI chat. AiChatRequest takes optional board_id;
+  handler resolves + persists against that board (defaults to first board
+  for back-compat). Cross-user board_id returns 404. 59 backend tests green.
+- Backend is now feature-complete. Next: frontend (registration UI +
+  multi-board switcher wired to the new endpoints), then richer cards + E2E.
 
 ## Conventions
 

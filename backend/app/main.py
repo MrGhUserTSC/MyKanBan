@@ -15,6 +15,7 @@ from app.database import (
     delete_board,
     get_board,
     get_board_for_username,
+    get_default_board_id,
     initialize_database,
     list_boards,
     rename_board,
@@ -323,9 +324,17 @@ def create_app(db_path: Path = DB_PATH) -> FastAPI:
         request: Request, payload: AiChatRequest, username: str = Depends(require_user)
     ) -> AiChatResponse:
         session_id = request.cookies.get(SESSION_COOKIE_NAME)
-        board = BoardPayload.model_validate(
-            get_board_for_username(app.state.db_path, username)
-        )
+        try:
+            board_id = (
+                payload.board_id
+                if payload.board_id is not None
+                else get_default_board_id(app.state.db_path, username)
+            )
+            board = BoardPayload.model_validate(
+                get_board(app.state.db_path, username, board_id)
+            )
+        except LookupError as error:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Board not found.") from error
         history: list[dict[str, str]] = app.state.chat_history.setdefault(session_id, [])
 
         if os.getenv("PM_AI_MODE") == "stub":
@@ -363,9 +372,10 @@ def create_app(db_path: Path = DB_PATH) -> FastAPI:
                     sorted(dropped_cards),
                 )
 
-            saved_board = save_board_for_username(
+            saved_board = save_board(
                 app.state.db_path,
                 username,
+                board_id,
                 next_board.model_dump(),
             )
             next_board = BoardPayload.model_validate(saved_board)
