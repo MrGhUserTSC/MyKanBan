@@ -1,4 +1,49 @@
-# Database model proposal
+# Database model
+
+> Update (build-out): the schema below the "Original proposal" heading was the
+> MVP design. The app has since grown user management and multiple boards per
+> user. The current schema is documented in this section; the original proposal
+> is kept for history.
+
+## Current schema
+
+```sql
+CREATE TABLE IF NOT EXISTS users (
+  id INTEGER PRIMARY KEY,
+  username TEXT NOT NULL UNIQUE,
+  password_hash TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS boards (
+  id INTEGER PRIMARY KEY,
+  user_id INTEGER NOT NULL,
+  name TEXT NOT NULL,
+  position INTEGER NOT NULL,
+  board_json TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+```
+
+Changes from the original proposal:
+
+- `users.password_hash` stores a salted PBKDF2-HMAC-SHA256 hash (stdlib only).
+  Login verifies against this; registration creates new users.
+- `boards` no longer has `UNIQUE(user_id)`. A user can own many boards, each
+  with a `name` and an ordering `position`.
+- A board cannot be deleted if it is the user's last remaining board.
+- `board_json` cards now carry `priority` (low/medium/high) and `dueDate`
+  in addition to `id`, `title`, and `details`.
+
+Migration: `initialize_database` upgrades legacy single-board databases in
+place (adds `password_hash`, rebuilds `boards` with the new columns, and
+backfills the demo user's password). Sessions remain in memory.
+
+---
+
+# Original proposal
 
 This document proposes the SQLite schema and persistence approach for the Project Management MVP before Part 6 implementation.
 

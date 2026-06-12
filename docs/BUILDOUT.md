@@ -64,6 +64,15 @@ Updated each iteration so work is resumable.
 - Full green: 64 backend + 26 frontend unit + 13 E2E = 103.
 - Next: polish (README/docs), consider labels/assignee, coverage review.
 
+### Iteration 4 (2026-06-12)
+- Done: docs refresh. README now describes the real app (accounts, multi-board,
+  rich cards, AI) with run/test instructions and endpoints. DATABASE.md gains a
+  "Current schema" section reflecting password_hash + multi-board + card fields,
+  with the original proposal preserved below.
+- Verified green: 64 backend + 26 frontend unit (+ 13 E2E from iter 3).
+- Remaining options if the loop continues: labels/assignee on cards, per-board
+  card counts in the switcher, coverage tooling. Core asks are complete.
+
 ## Conventions
 
 - Backend tests: `.venv\Scripts\python.exe -m pytest backend -q` with `PYTHONPATH=backend`.
