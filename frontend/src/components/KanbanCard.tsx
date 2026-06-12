@@ -2,19 +2,33 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import clsx from "clsx";
 import { useState, type FormEvent } from "react";
-import type { Card } from "@/lib/kanban";
+import {
+  cardPriority,
+  PRIORITIES,
+  type Card,
+  type CardMeta,
+  type Priority,
+} from "@/lib/kanban";
 import { PencilIcon, TrashIcon } from "@/components/icons";
+import { DueDateChip, PriorityBadge } from "@/components/CardBadges";
 
 type KanbanCardProps = {
   card: Card;
   onDelete: (cardId: string) => void;
-  onUpdate: (cardId: string, title: string, details: string) => void;
+  onUpdate: (
+    cardId: string,
+    title: string,
+    details: string,
+    meta: CardMeta
+  ) => void;
 };
 
 export const KanbanCard = ({ card, onDelete, onUpdate }: KanbanCardProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [title, setTitle] = useState(card.title);
   const [details, setDetails] = useState(card.details);
+  const [priority, setPriority] = useState<Priority>(cardPriority(card));
+  const [dueDate, setDueDate] = useState(card.dueDate ?? "");
   const {
     attributes,
     listeners,
@@ -36,13 +50,18 @@ export const KanbanCard = ({ card, onDelete, onUpdate }: KanbanCardProps) => {
       return;
     }
 
-    onUpdate(card.id, title.trim(), details.trim() || "No details yet.");
+    onUpdate(card.id, title.trim(), details.trim() || "No details yet.", {
+      priority,
+      dueDate,
+    });
     setIsEditing(false);
   };
 
   const handleCancel = () => {
     setTitle(card.title);
     setDetails(card.details);
+    setPriority(cardPriority(card));
+    setDueDate(card.dueDate ?? "");
     setIsEditing(false);
   };
 
@@ -72,6 +91,27 @@ export const KanbanCard = ({ card, onDelete, onUpdate }: KanbanCardProps) => {
             className="w-full resize-none rounded-xl border border-[var(--stroke)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--gray-text)] outline-none transition focus:border-[var(--primary-blue)]"
             aria-label={`Edit details for ${card.title}`}
           />
+          <div className="grid grid-cols-2 gap-2">
+            <select
+              value={priority}
+              onChange={(event) => setPriority(event.target.value as Priority)}
+              aria-label={`Edit priority for ${card.title}`}
+              className="rounded-xl border border-[var(--stroke)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--navy-dark)] outline-none transition focus:border-[var(--primary-blue)]"
+            >
+              {PRIORITIES.map((value) => (
+                <option key={value} value={value}>
+                  {value.charAt(0).toUpperCase() + value.slice(1)}
+                </option>
+              ))}
+            </select>
+            <input
+              type="date"
+              value={dueDate}
+              onChange={(event) => setDueDate(event.target.value)}
+              aria-label={`Edit due date for ${card.title}`}
+              className="rounded-xl border border-[var(--stroke)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--navy-dark)] outline-none transition focus:border-[var(--primary-blue)]"
+            />
+          </div>
           <div className="flex items-center gap-2">
             <button
               type="submit"
@@ -113,6 +153,10 @@ export const KanbanCard = ({ card, onDelete, onUpdate }: KanbanCardProps) => {
               >
                 {card.details}
               </p>
+              <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                <PriorityBadge priority={cardPriority(card)} />
+                {card.dueDate ? <DueDateChip dueDate={card.dueDate} /> : null}
+              </div>
             </div>
             <div className="mt-3 flex items-center justify-end gap-1 border-t border-[var(--stroke)] pt-2">
               <button

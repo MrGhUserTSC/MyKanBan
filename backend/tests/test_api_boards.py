@@ -115,11 +115,57 @@ def test_get_and_update_board_by_id(client: TestClient) -> None:
 
     new_content = {
         "columns": [{"id": "col-todo", "title": "To Do", "cardIds": ["c1"]}],
-        "cards": {"c1": {"id": "c1", "title": "Ship", "details": "Now."}},
+        "cards": {
+            "c1": {
+                "id": "c1",
+                "title": "Ship",
+                "details": "Now.",
+                "priority": "high",
+                "dueDate": "2026-07-01",
+            }
+        },
     }
     update = client.put(f"/api/boards/{board_id}", json=new_content)
     assert update.status_code == 200
     assert client.get(f"/api/boards/{board_id}").json() == new_content
+
+
+def test_card_priority_and_due_date_round_trip(client: TestClient) -> None:
+    login(client)
+    board_id = client.post("/api/boards", json={"name": "Sprint"}).json()["id"]
+    content = {
+        "columns": [{"id": "col-todo", "title": "To Do", "cardIds": ["c1"]}],
+        "cards": {
+            "c1": {
+                "id": "c1",
+                "title": "Launch",
+                "details": "Go live.",
+                "priority": "high",
+                "dueDate": "2026-08-15",
+            }
+        },
+    }
+
+    client.put(f"/api/boards/{board_id}", json=content)
+    stored = client.get(f"/api/boards/{board_id}").json()
+
+    assert stored["cards"]["c1"]["priority"] == "high"
+    assert stored["cards"]["c1"]["dueDate"] == "2026-08-15"
+
+
+def test_card_fields_default_when_omitted(client: TestClient) -> None:
+    login(client)
+    board_id = client.post("/api/boards", json={"name": "Sprint"}).json()["id"]
+    content = {
+        "columns": [{"id": "col-todo", "title": "To Do", "cardIds": ["c1"]}],
+        "cards": {"c1": {"id": "c1", "title": "Plain", "details": "No metadata."}},
+    }
+
+    client.put(f"/api/boards/{board_id}", json=content)
+    stored = client.get(f"/api/boards/{board_id}").json()
+
+    assert stored["cards"]["c1"]["priority"] == "medium"
+    assert stored["cards"]["c1"]["dueDate"] == ""
 
 
 def test_rename_board(client: TestClient) -> None:

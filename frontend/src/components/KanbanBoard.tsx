@@ -34,6 +34,7 @@ import {
   moveCard,
   moveColumn,
   type BoardData,
+  type CardMeta,
 } from "@/lib/kanban";
 
 type KanbanBoardProps = {
@@ -138,13 +139,24 @@ export const KanbanBoard = ({
     }));
   };
 
-  const handleAddCard = (columnId: string, title: string, details: string) => {
+  const handleAddCard = (
+    columnId: string,
+    title: string,
+    details: string,
+    meta: CardMeta
+  ) => {
     const id = createId("card");
     updateBoard((current) => ({
       ...current,
       cards: {
         ...current.cards,
-        [id]: { id, title, details: details || "No details yet." },
+        [id]: {
+          id,
+          title,
+          details: details || "No details yet.",
+          priority: meta.priority,
+          dueDate: meta.dueDate,
+        },
       },
       columns: current.columns.map((column) =>
         column.id === columnId
@@ -173,12 +185,23 @@ export const KanbanBoard = ({
     });
   };
 
-  const handleUpdateCard = (cardId: string, title: string, details: string) => {
+  const handleUpdateCard = (
+    cardId: string,
+    title: string,
+    details: string,
+    meta: CardMeta
+  ) => {
     updateBoard((current) => ({
       ...current,
       cards: {
         ...current.cards,
-        [cardId]: { ...current.cards[cardId], title, details },
+        [cardId]: {
+          ...current.cards[cardId],
+          title,
+          details,
+          priority: meta.priority,
+          dueDate: meta.dueDate,
+        },
       },
     }));
   };

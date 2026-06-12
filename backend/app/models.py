@@ -35,6 +35,8 @@ class CardPayload(BaseModel):
     id: str
     title: str
     details: str
+    priority: str = "medium"
+    dueDate: str = ""
 
 
 class ColumnPayload(BaseModel):

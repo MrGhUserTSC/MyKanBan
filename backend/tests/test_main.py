@@ -129,6 +129,8 @@ def test_board_endpoint_updates_board(client: TestClient) -> None:
                 "id": "card-1",
                 "title": "Updated title",
                 "details": "Updated details.",
+                "priority": "medium",
+                "dueDate": "",
             }
         },
     }

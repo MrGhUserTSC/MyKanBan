@@ -1,8 +1,18 @@
+export type Priority = "low" | "medium" | "high";
+
+export const PRIORITIES: Priority[] = ["low", "medium", "high"];
+
 export type Card = {
   id: string;
   title: string;
   details: string;
+  priority?: Priority;
+  dueDate?: string;
 };
+
+export const cardPriority = (card: Card): Priority => card.priority ?? "medium";
+
+export type CardMeta = { priority: Priority; dueDate: string };
 
 export type Column = {
   id: string;

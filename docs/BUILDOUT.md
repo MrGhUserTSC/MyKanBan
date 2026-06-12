@@ -51,6 +51,19 @@ Updated each iteration so work is resumable.
 - Full green: 60 backend + 23 frontend unit + 13 E2E.
 - Next: richer card fields (assignee/priority/labels/due date), then polish.
 
+### Iteration 3 (2026-06-12)
+- Done: richer cards with priority (low/medium/high) and due date.
+  - CardPayload gains priority + dueDate (defaults medium / empty); DEFAULT_BOARD
+    and the exact-equality test fixtures updated to match.
+  - Frontend: Card type + helpers, CardBadges component, priority/date inputs in
+    the new-card form and card editor, badges on cards and drag preview.
+  - AI fix: the strict structured-output schema only allowed id/title/details,
+    so AI board updates were silently resetting priority/dueDate. Added both to
+    the schema (required) and the system prompt so they round-trip.
+- Tests: backend 62 -> 64, frontend unit 23 -> 26, E2E 13 green.
+- Full green: 64 backend + 26 frontend unit + 13 E2E = 103.
+- Next: polish (README/docs), consider labels/assignee, coverage review.
+
 ## Conventions
 
 - Backend tests: `.venv\Scripts\python.exe -m pytest backend -q` with `PYTHONPATH=backend`.

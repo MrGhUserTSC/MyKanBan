@@ -1,11 +1,20 @@
 import { useState, type FormEvent } from "react";
 import { PlusIcon } from "@/components/icons";
+import { PRIORITIES, type CardMeta, type Priority } from "@/lib/kanban";
 
-const initialFormState = { title: "", details: "" };
+const initialFormState = {
+  title: "",
+  details: "",
+  priority: "medium" as Priority,
+  dueDate: "",
+};
 
 type NewCardFormProps = {
-  onAdd: (title: string, details: string) => void;
+  onAdd: (title: string, details: string, meta: CardMeta) => void;
 };
+
+const fieldClass =
+  "w-full rounded-xl border border-[var(--stroke)] bg-white px-3 py-2 text-sm text-[var(--navy-dark)] outline-none transition focus:border-[var(--primary-blue)]";
 
 export const NewCardForm = ({ onAdd }: NewCardFormProps) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -16,7 +25,10 @@ export const NewCardForm = ({ onAdd }: NewCardFormProps) => {
     if (!formState.title.trim()) {
       return;
     }
-    onAdd(formState.title.trim(), formState.details.trim());
+    onAdd(formState.title.trim(), formState.details.trim(), {
+      priority: formState.priority,
+      dueDate: formState.dueDate,
+    });
     setFormState(initialFormState);
     setIsOpen(false);
   };
@@ -43,6 +55,47 @@ export const NewCardForm = ({ onAdd }: NewCardFormProps) => {
             rows={3}
             className="w-full resize-none rounded-xl border border-[var(--stroke)] bg-white px-3 py-2 text-sm text-[var(--gray-text)] outline-none transition focus:border-[var(--primary-blue)]"
           />
+          <div className="grid grid-cols-2 gap-2">
+            <label className="block">
+              <span className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-[var(--gray-text)]">
+                Priority
+              </span>
+              <select
+                aria-label="Card priority"
+                value={formState.priority}
+                onChange={(event) =>
+                  setFormState((prev) => ({
+                    ...prev,
+                    priority: event.target.value as Priority,
+                  }))
+                }
+                className={`mt-1 ${fieldClass}`}
+              >
+                {PRIORITIES.map((priority) => (
+                  <option key={priority} value={priority}>
+                    {priority.charAt(0).toUpperCase() + priority.slice(1)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block">
+              <span className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-[var(--gray-text)]">
+                Due date
+              </span>
+              <input
+                type="date"
+                aria-label="Card due date"
+                value={formState.dueDate}
+                onChange={(event) =>
+                  setFormState((prev) => ({
+                    ...prev,
+                    dueDate: event.target.value,
+                  }))
+                }
+                className={`mt-1 ${fieldClass}`}
+              />
+            </label>
+          </div>
           <div className="flex items-center gap-2">
             <button
               type="submit"
