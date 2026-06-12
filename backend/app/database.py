@@ -349,15 +349,14 @@ def rename_board(db_path: Path, username: str, board_id: int, name: str) -> dict
 
 def delete_board(db_path: Path, username: str, board_id: int) -> None:
     with connect_database(db_path) as connection:
-        user_id = _require_user_id(connection, username)
+        row = _owned_board_row(connection, username, board_id)
         count = connection.execute(
             "SELECT COUNT(*) AS count FROM boards WHERE user_id = ?",
-            (user_id,),
+            (row["user_id"],),
         ).fetchone()["count"]
         if count <= 1:
             raise ValueError("Cannot delete the last board.")
 
-        _owned_board_row(connection, username, board_id)
         connection.execute("DELETE FROM boards WHERE id = ?", (board_id,))
         connection.commit()
 

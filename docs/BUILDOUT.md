@@ -21,7 +21,15 @@ Updated each iteration so work is resumable.
 
 ### Iteration 1 (2026-06-12)
 - Baseline: 25 backend tests green. Established roadmap.
-- In progress: backend foundation (security + schema + data-access).
+- Done: backend foundation. security.py (pbkdf2), database.py rewrite to
+  multi-board schema + migration + data-access layer. 42 tests green.
+
+### Iteration 2 (2026-06-12)
+- Done: backend API. Registration (POST /api/register), DB-backed login,
+  multi-board CRUD (GET/POST /api/boards, GET/PUT/PATCH/DELETE /api/boards/{id}).
+- Refactored auth into a require_user dependency.
+- Found + fixed ownership-vs-last-board ordering bug in delete_board.
+- 57 tests green. Next: board-scoped AI chat + richer card fields, then frontend.
 
 ## Conventions
 
