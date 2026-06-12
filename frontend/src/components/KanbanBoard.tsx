@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import clsx from "clsx";
 import {
   DndContext,
   DragOverlay,
@@ -17,6 +18,14 @@ import {
 } from "@dnd-kit/sortable";
 import { KanbanColumn } from "@/components/KanbanColumn";
 import { KanbanCardPreview } from "@/components/KanbanCardPreview";
+import {
+  AlertIcon,
+  CheckIcon,
+  LayoutIcon,
+  LogoutIcon,
+  SpinnerIcon,
+  UserIcon,
+} from "@/components/icons";
 import {
   createId,
   initialData,
@@ -165,61 +174,59 @@ export const KanbanBoard = ({
 
   return (
     <section className="relative min-w-0">
-      <div className="flex flex-col gap-10">
-        <header className="flex flex-col gap-6 rounded-[32px] border border-[var(--stroke)] bg-white/80 p-8 shadow-[var(--shadow)] backdrop-blur">
-          <div className="flex flex-wrap items-start justify-between gap-6">
+      <div className="flex flex-col gap-6">
+        <header className="flex flex-wrap items-center justify-between gap-4 rounded-[28px] border border-[var(--stroke)] bg-white/80 px-6 py-5 shadow-[var(--shadow)] backdrop-blur">
+          <div className="flex items-center gap-3">
+            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--secondary-purple)] text-white">
+              <LayoutIcon className="h-5 w-5" />
+            </span>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.35em] text-[var(--gray-text)]">
-                Single Board Kanban
-              </p>
-              <h1 className="mt-3 font-display text-4xl font-semibold text-[var(--navy-dark)]">
+              <h1 className="font-display text-2xl font-semibold leading-tight text-[var(--navy-dark)]">
                 Kanban Studio
               </h1>
-              <p className="mt-3 max-w-xl text-sm leading-6 text-[var(--gray-text)]">
-                Keep momentum visible. Rename columns, drag cards between stages,
-                and capture quick notes without getting buried in settings.
+              <p className="text-xs font-medium text-[var(--gray-text)]">
+                {board.columns.length} columns · {Object.keys(board.cards).length} cards
               </p>
-            </div>
-            <div className="rounded-2xl border border-[var(--stroke)] bg-[var(--surface)] px-5 py-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[var(--gray-text)]">
-                Signed In
-              </p>
-              <p className="mt-2 text-lg font-semibold text-[var(--primary-blue)]">
-                {username}
-              </p>
-              {onLogout ? (
-                <button
-                  type="button"
-                  onClick={onLogout}
-                  className="mt-4 rounded-full border border-[var(--stroke)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--navy-dark)] transition hover:border-[var(--primary-blue)] hover:text-[var(--primary-blue)]"
-                >
-                  Log out
-                </button>
-              ) : null}
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-4">
-            {board.columns.map((column) => (
-              <div
-                key={column.id}
-                className="flex items-center gap-2 rounded-full border border-[var(--stroke)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-[var(--navy-dark)]"
-              >
-                <span className="h-2 w-2 rounded-full bg-[var(--accent-yellow)]" />
-                {column.title}
-              </div>
-            ))}
+
+          <div className="flex flex-wrap items-center gap-3">
             <div
-              className={`
-                rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em]
-                ${
-                  saveStatus === "error"
-                    ? "border-[#f3d3d0] bg-[#fff4f2] text-[#b42318]"
-                    : "border-[var(--stroke)] bg-white text-[var(--gray-text)]"
-                }
-              `}
+              className={clsx(
+                "flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold",
+                saveStatus === "error"
+                  ? "border-[#f3d3d0] bg-[#fff4f2] text-[#b42318]"
+                  : "border-[var(--stroke)] bg-white text-[var(--gray-text)]"
+              )}
+              title={saveStateLabel}
             >
-              {saveStateLabel}
+              {saveStatus === "saving" ? (
+                <SpinnerIcon className="h-3.5 w-3.5" />
+              ) : saveStatus === "error" ? (
+                <AlertIcon className="h-3.5 w-3.5" />
+              ) : (
+                <CheckIcon className="h-3.5 w-3.5 text-[var(--primary-blue)]" />
+              )}
+              <span className="hidden sm:inline">{saveStateLabel}</span>
             </div>
+
+            <div className="flex items-center gap-2 rounded-full border border-[var(--stroke)] bg-[var(--surface)] px-3 py-1.5">
+              <UserIcon className="h-4 w-4 text-[var(--primary-blue)]" />
+              <span className="text-sm font-semibold text-[var(--navy-dark)]">
+                {username}
+              </span>
+            </div>
+
+            {onLogout ? (
+              <button
+                type="button"
+                onClick={onLogout}
+                className="flex items-center gap-2 rounded-full border border-[var(--stroke)] px-3 py-1.5 text-xs font-semibold text-[var(--navy-dark)] transition hover:border-[var(--primary-blue)] hover:text-[var(--primary-blue)]"
+              >
+                <LogoutIcon className="h-4 w-4" />
+                <span className="hidden sm:inline">Log out</span>
+              </button>
+            ) : null}
           </div>
         </header>
 
@@ -233,7 +240,7 @@ export const KanbanBoard = ({
             items={board.columns.map((column) => column.id)}
             strategy={horizontalListSortingStrategy}
           >
-            <section className="grid gap-6 lg:grid-cols-5">
+            <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
               {board.columns.map((column) => (
                 <KanbanColumn
                   key={column.id}

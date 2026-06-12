@@ -3,6 +3,7 @@ import { CSS } from "@dnd-kit/utilities";
 import clsx from "clsx";
 import { useState, type FormEvent } from "react";
 import type { Card } from "@/lib/kanban";
+import { PencilIcon, TrashIcon } from "@/components/icons";
 
 type KanbanCardProps = {
   card: Card;
@@ -113,38 +114,24 @@ export const KanbanCard = ({ card, onDelete, onUpdate }: KanbanCardProps) => {
                 {card.details}
               </p>
             </div>
-            <div className="mt-4 flex items-center justify-between gap-3 border-t border-[var(--stroke)] pt-3">
+            <div className="mt-3 flex items-center justify-end gap-1 border-t border-[var(--stroke)] pt-2">
               <button
                 type="button"
                 onClick={() => setIsEditing(true)}
-                className="rounded-full border border-transparent px-2 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--gray-text)] transition hover:border-[var(--stroke)] hover:text-[var(--navy-dark)]"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-transparent text-[var(--gray-text)] transition hover:border-[var(--stroke)] hover:text-[var(--primary-blue)]"
                 aria-label={`Edit ${card.title}`}
+                title={`Edit ${card.title}`}
               >
-                Edit
+                <PencilIcon className="h-4 w-4" />
               </button>
               <button
                 type="button"
                 onClick={() => onDelete(card.id)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-transparent text-[var(--gray-text)] transition hover:border-[var(--stroke)] hover:text-[var(--navy-dark)]"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-transparent text-[var(--gray-text)] transition hover:border-[var(--stroke)] hover:text-[#b42318]"
                 aria-label={`Delete ${card.title}`}
                 title={`Delete ${card.title}`}
               >
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 24 24"
-                  className="h-4 w-4"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M3 6h18" />
-                  <path d="M8 6V4.5h8V6" />
-                  <path d="M6.5 6l1 13h9l1-13" />
-                  <path d="M10 10.5v5" />
-                  <path d="M14 10.5v5" />
-                </svg>
+                <TrashIcon className="h-4 w-4" />
               </button>
             </div>
           </div>

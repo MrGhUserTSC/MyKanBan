@@ -28,6 +28,7 @@ def main() -> None:
         else os.pathsep.join([backend_path, existing_path])
     )
     env["PM_AI_MODE"] = "stub"
+    env["PM_DB_PATH"] = str(PROJECT_ROOT / "backend" / "data" / "pm-e2e.db")
 
     python_command = str(VENV_PYTHON) if VENV_PYTHON.exists() else sys.executable
 

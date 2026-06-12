@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import json
 import sqlite3
 from datetime import UTC, datetime
@@ -170,7 +171,7 @@ def get_board_for_username(db_path: Path, username: str) -> dict[str, Any]:
                 ),
             )
             connection.commit()
-            return DEFAULT_BOARD
+            return copy.deepcopy(DEFAULT_BOARD)
 
         return json.loads(row["board_json"])
 

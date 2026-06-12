@@ -72,7 +72,7 @@ const resetBoard = async (page: Page) => {
 };
 
 const reloadAfterSave = async (page: Page) => {
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(600);
   await page.reload();
 };
 

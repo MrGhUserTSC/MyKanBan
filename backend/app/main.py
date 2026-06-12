@@ -1,3 +1,4 @@
+import logging
 import os
 from pathlib import Path
 import re
@@ -38,10 +39,12 @@ LOCAL_FRONTEND_DIR = PROJECT_ROOT / "frontend" / "out"
 ACTIVE_FRONTEND_DIR = FRONTEND_DIR if FRONTEND_DIR.exists() else LOCAL_FRONTEND_DIR
 INDEX_FILE = STATIC_DIR / "index.html"
 FRONTEND_INDEX_FILE = ACTIVE_FRONTEND_DIR / "index.html"
-DB_PATH = PROJECT_ROOT / "backend" / "data" / "pm.db"
+DB_PATH = Path(os.getenv("PM_DB_PATH", str(PROJECT_ROOT / "backend" / "data" / "pm.db")))
 SESSION_COOKIE_NAME = "pm_session"
 MVP_PASSWORD = "password"
 PLAYWRIGHT_AI_MODEL = "stub-playwright"
+
+logger = logging.getLogger(__name__)
 
 
 def load_env_file(path: Path) -> None:
@@ -120,6 +123,20 @@ def build_stub_ai_response(
     )
 
 
+def find_dropped_ids(
+    current: BoardPayload,
+    next_board: BoardPayload,
+) -> tuple[set[str], set[str]]:
+    current_column_ids = {column.id for column in current.columns}
+    next_column_ids = {column.id for column in next_board.columns}
+    current_card_ids = set(current.cards.keys())
+    next_card_ids = set(next_board.cards.keys())
+
+    dropped_columns = current_column_ids - next_column_ids
+    dropped_cards = current_card_ids - next_card_ids
+    return dropped_columns, dropped_cards
+
+
 def create_app(db_path: Path = DB_PATH) -> FastAPI:
     initialize_database(db_path)
 
@@ -163,7 +180,7 @@ def create_app(db_path: Path = DB_PATH) -> FastAPI:
         )
         return SessionResponse(username=payload.username)
 
-    @app.post("/api/logout", status_code=status.HTTP_204_NO_CONTENT)
+    @app.post("/api/logout")
     def logout(request: Request, response: Response) -> Response:
         session_id = request.cookies.get(SESSION_COOKIE_NAME)
         if session_id:
@@ -278,6 +295,15 @@ def create_app(db_path: Path = DB_PATH) -> FastAPI:
         next_board = structured.board or board
 
         if updated:
+            dropped_columns, dropped_cards = find_dropped_ids(board, next_board)
+            if dropped_columns or dropped_cards:
+                logger.warning(
+                    "AI board update for user %s dropped existing ids (columns: %s, cards: %s)",
+                    username,
+                    sorted(dropped_columns),
+                    sorted(dropped_cards),
+                )
+
             saved_board = save_board_for_username(
                 app.state.db_path,
                 username,
@@ -295,18 +321,16 @@ def create_app(db_path: Path = DB_PATH) -> FastAPI:
             model=model,
         )
 
-    @app.get("/", response_class=FileResponse)
-    def index() -> FileResponse:
-        if FRONTEND_INDEX_FILE.exists():
-            return FileResponse(FRONTEND_INDEX_FILE)
-        return FileResponse(INDEX_FILE)
-
-    if ACTIVE_FRONTEND_DIR.exists():
+    if FRONTEND_INDEX_FILE.exists():
         app.mount(
             "/",
             StaticFiles(directory=ACTIVE_FRONTEND_DIR, html=True),
             name="frontend",
         )
+    else:
+        @app.get("/", response_class=FileResponse)
+        def index() -> FileResponse:
+            return FileResponse(INDEX_FILE)
 
     return app
 

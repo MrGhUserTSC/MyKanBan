@@ -4,6 +4,7 @@ import { CSS } from "@dnd-kit/utilities";
 import type { Card, Column } from "@/lib/kanban";
 import { KanbanCard } from "@/components/KanbanCard";
 import { NewCardForm } from "@/components/NewCardForm";
+import { GripIcon } from "@/components/icons";
 
 type KanbanColumnProps = {
   column: Column;
@@ -48,29 +49,28 @@ export const KanbanColumn = ({
       )}
       data-testid={`column-${column.id}`}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="w-full">
-          <div className="flex items-center gap-3">
-            <div className="h-2 w-10 rounded-full bg-[var(--accent-yellow)]" />
-            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--gray-text)]">
-              {cards.length} cards
-            </span>
-          </div>
-          <input
-            value={column.title}
-            onChange={(event) => onRename(column.id, event.target.value)}
-            className="mt-3 w-full bg-transparent font-display text-lg font-semibold text-[var(--navy-dark)] outline-none"
-            aria-label="Column title"
-          />
-        </div>
+      <div className="flex items-center gap-2">
+        <span className="h-6 w-1.5 shrink-0 rounded-full bg-[var(--accent-yellow)]" />
+        <input
+          value={column.title}
+          onChange={(event) => onRename(column.id, event.target.value)}
+          className="min-w-0 flex-1 bg-transparent font-display text-base font-semibold text-[var(--navy-dark)] outline-none"
+          aria-label="Column title"
+        />
+        <span
+          className="shrink-0 rounded-full bg-[var(--surface)] px-2 py-0.5 text-xs font-semibold tabular-nums text-[var(--gray-text)]"
+          title={`${cards.length} cards`}
+        >
+          {cards.length}
+        </span>
         <button
           type="button"
-          className="rounded-full border border-[var(--stroke)] px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--gray-text)] transition hover:border-[var(--primary-blue)] hover:text-[var(--primary-blue)]"
+          className="flex shrink-0 cursor-grab items-center justify-center rounded-lg p-1.5 text-[var(--gray-text)] transition hover:bg-[var(--surface)] hover:text-[var(--primary-blue)] active:cursor-grabbing"
           aria-label={`Reorder ${column.title}`}
           {...attributes}
           {...listeners}
         >
-          Move
+          <GripIcon className="h-4 w-4" />
         </button>
       </div>
       <div className="mt-4 flex flex-1 flex-col gap-3">

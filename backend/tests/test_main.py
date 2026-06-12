@@ -268,6 +268,50 @@ def test_ai_chat_applies_board_update_and_persists_it(client: TestClient) -> Non
     assert read_response.json() == updated_board.model_dump()
 
 
+def test_ai_chat_logs_warning_when_board_update_drops_existing_ids(
+    client: TestClient,
+    caplog,
+) -> None:
+    login_and_return_cookie(client)
+    updated_board = BoardPayload.model_validate(
+        {
+            "columns": [
+                {"id": "col-backlog", "title": "Backlog", "cardIds": ["card-1"]},
+            ],
+            "cards": {
+                "card-1": {
+                    "id": "card-1",
+                    "title": "Align roadmap themes",
+                    "details": "Draft quarterly themes with impact statements and metrics.",
+                },
+            },
+        }
+    )
+
+    with patch(
+        "app.main.request_structured_openrouter_chat",
+        new=AsyncMock(
+            return_value=(
+                OpenRouterResult(
+                    content='{"reply":"Trimmed the board.","board":{}}',
+                    model="openai/gpt-oss-120b",
+                    raw_response={},
+                ),
+                type(
+                    "Structured",
+                    (),
+                    {"reply": "Trimmed the board.", "board": updated_board},
+                )(),
+            )
+        ),
+    ):
+        with caplog.at_level("WARNING", logger="app.main"):
+            response = client.post("/api/ai/chat", json={"message": "Trim the board."})
+
+    assert response.status_code == 200
+    assert any("dropped existing ids" in record.message for record in caplog.records)
+
+
 def test_ai_chat_surfaces_structured_output_failure(client: TestClient) -> None:
     login_and_return_cookie(client)
 

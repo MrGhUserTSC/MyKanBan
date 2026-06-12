@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useRef, useState } from "react";
+import { SendIcon, SparkleIcon } from "@/components/icons";
 
 export type ChatMessage = {
   content: string;
@@ -45,18 +46,19 @@ export const AIChatSidebar = ({
   };
 
   return (
-    <aside className="flex min-h-[720px] flex-col rounded-[32px] border border-[var(--stroke)] bg-white/88 shadow-[var(--shadow)] backdrop-blur">
-      <div className="border-b border-[var(--stroke)] px-6 py-5">
-        <p className="text-xs font-semibold uppercase tracking-[0.3em] text-[var(--gray-text)]">
-          AI Assistant
-        </p>
-        <h2 className="mt-3 font-display text-2xl font-semibold text-[var(--navy-dark)]">
-          Board chat
-        </h2>
-        <p className="mt-3 text-sm leading-6 text-[var(--gray-text)]">
-          Ask for summaries or direct board changes. The assistant can update the
-          board automatically when it decides a change is needed.
-        </p>
+    <aside className="flex h-[640px] flex-col rounded-[28px] border border-[var(--stroke)] bg-white/88 shadow-[var(--shadow)] backdrop-blur xl:sticky xl:top-8 xl:h-[calc(100vh-4rem)]">
+      <div className="flex items-center gap-3 border-b border-[var(--stroke)] px-5 py-4">
+        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--secondary-purple)] text-white">
+          <SparkleIcon className="h-5 w-5" />
+        </span>
+        <div>
+          <h2 className="font-display text-lg font-semibold leading-tight text-[var(--navy-dark)]">
+            Board chat
+          </h2>
+          <p className="text-xs text-[var(--gray-text)]">
+            Summarize or edit your board
+          </p>
+        </div>
       </div>
 
       <div
@@ -118,8 +120,9 @@ export const AIChatSidebar = ({
           <button
             type="submit"
             disabled={isSending || !draft.trim()}
-            className="w-full rounded-full bg-[var(--secondary-purple)] px-5 py-3 text-sm font-semibold uppercase tracking-[0.18em] text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
+            className="flex w-full items-center justify-center gap-2 rounded-full bg-[var(--secondary-purple)] px-5 py-3 text-sm font-semibold uppercase tracking-[0.18em] text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
           >
+            <SendIcon className="h-4 w-4" />
             {isSending ? "Sending..." : "Send message"}
           </button>
         </form>
