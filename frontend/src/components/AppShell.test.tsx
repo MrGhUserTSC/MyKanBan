@@ -101,6 +101,9 @@ describe("AppShell", () => {
     expect(
       screen.getByRole("button", { name: /^create account$/i })
     ).toBeInTheDocument();
+    // The registration form starts blank rather than inheriting the demo defaults.
+    expect(screen.getByLabelText(/username/i)).toHaveValue("");
+    expect(screen.getByLabelText(/password/i)).toHaveValue("");
   });
 
   it("registers a new account and loads its board", async () => {

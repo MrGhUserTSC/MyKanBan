@@ -422,7 +422,7 @@ export const AppShell = () => {
             </p>
           </div>
 
-          <form className="mt-8 space-y-4" onSubmit={handleAuthSubmit}>
+          <form key={authMode} className="mt-8 space-y-4" onSubmit={handleAuthSubmit}>
             <label className="block">
               <span className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--gray-text)]">
                 Username
