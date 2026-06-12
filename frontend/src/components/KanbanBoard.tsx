@@ -18,6 +18,8 @@ import {
 } from "@dnd-kit/sortable";
 import { KanbanColumn } from "@/components/KanbanColumn";
 import { KanbanCardPreview } from "@/components/KanbanCardPreview";
+import { BoardSwitcher } from "@/components/BoardSwitcher";
+import type { BoardSummary } from "@/lib/api";
 import {
   AlertIcon,
   CheckIcon,
@@ -32,6 +34,7 @@ import {
   moveCard,
   moveColumn,
   type BoardData,
+  type CardMeta,
 } from "@/lib/kanban";
 
 type KanbanBoardProps = {
@@ -41,6 +44,12 @@ type KanbanBoardProps = {
   saveError?: string | null;
   saveStatus?: "idle" | "saving" | "error";
   username?: string;
+  boards?: BoardSummary[];
+  activeBoardId?: number | null;
+  onSelectBoard?: (boardId: number) => void;
+  onCreateBoard?: (name: string) => void;
+  onRenameBoard?: (boardId: number, name: string) => void;
+  onDeleteBoard?: (boardId: number) => void;
 };
 
 export const KanbanBoard = ({
@@ -50,6 +59,12 @@ export const KanbanBoard = ({
   saveError,
   saveStatus = "idle",
   username = "user",
+  boards,
+  activeBoardId = null,
+  onSelectBoard,
+  onCreateBoard,
+  onRenameBoard,
+  onDeleteBoard,
 }: KanbanBoardProps) => {
   const [board, setBoard] = useState<BoardData>(() => initialBoard ?? initialData);
   const [activeItem, setActiveItem] = useState<{
@@ -124,13 +139,24 @@ export const KanbanBoard = ({
     }));
   };
 
-  const handleAddCard = (columnId: string, title: string, details: string) => {
+  const handleAddCard = (
+    columnId: string,
+    title: string,
+    details: string,
+    meta: CardMeta
+  ) => {
     const id = createId("card");
     updateBoard((current) => ({
       ...current,
       cards: {
         ...current.cards,
-        [id]: { id, title, details: details || "No details yet." },
+        [id]: {
+          id,
+          title,
+          details: details || "No details yet.",
+          priority: meta.priority,
+          dueDate: meta.dueDate,
+        },
       },
       columns: current.columns.map((column) =>
         column.id === columnId
@@ -159,12 +185,23 @@ export const KanbanBoard = ({
     });
   };
 
-  const handleUpdateCard = (cardId: string, title: string, details: string) => {
+  const handleUpdateCard = (
+    cardId: string,
+    title: string,
+    details: string,
+    meta: CardMeta
+  ) => {
     updateBoard((current) => ({
       ...current,
       cards: {
         ...current.cards,
-        [cardId]: { ...current.cards[cardId], title, details },
+        [cardId]: {
+          ...current.cards[cardId],
+          title,
+          details,
+          priority: meta.priority,
+          dueDate: meta.dueDate,
+        },
       },
     }));
   };
@@ -228,6 +265,19 @@ export const KanbanBoard = ({
               </button>
             ) : null}
           </div>
+
+          {boards && boards.length > 0 && onSelectBoard ? (
+            <div className="flex w-full items-center gap-3 border-t border-[var(--stroke)] pt-4">
+              <BoardSwitcher
+                boards={boards}
+                activeBoardId={activeBoardId}
+                onSelect={onSelectBoard}
+                onCreate={(name) => onCreateBoard?.(name)}
+                onRename={(id, name) => onRenameBoard?.(id, name)}
+                onDelete={(id) => onDeleteBoard?.(id)}
+              />
+            </div>
+          ) : null}
         </header>
 
         <DndContext

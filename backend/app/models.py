@@ -6,14 +6,37 @@ class LoginPayload(BaseModel):
     password: str
 
 
+class RegisterPayload(BaseModel):
+    username: str
+    password: str
+
+
 class SessionResponse(BaseModel):
     username: str
+
+
+class BoardSummary(BaseModel):
+    id: int
+    name: str
+    position: int
+    created_at: str
+    updated_at: str
+
+
+class CreateBoardPayload(BaseModel):
+    name: str
+
+
+class RenameBoardPayload(BaseModel):
+    name: str
 
 
 class CardPayload(BaseModel):
     id: str
     title: str
     details: str
+    priority: str = "medium"
+    dueDate: str = ""
 
 
 class ColumnPayload(BaseModel):
@@ -40,6 +63,7 @@ class ChatMessagePayload(BaseModel):
 
 class AiChatRequest(BaseModel):
     message: str
+    board_id: int | None = None
 
 
 class AiChatStructuredResponse(BaseModel):

@@ -48,6 +48,42 @@ def test_build_structured_chat_payload_includes_board_history_and_schema() -> No
     assert payload["plugins"] == [{"id": "response-healing"}]
 
 
+def test_structured_schema_includes_card_priority_and_due_date() -> None:
+    board = BoardPayload.model_validate(DEFAULT_BOARD)
+    payload = build_structured_chat_payload(
+        board=board,
+        history=[],
+        user_message="Add a high priority card",
+        model="openai/gpt-oss-120b",
+    )
+
+    card_schema = payload["response_format"]["json_schema"]["schema"]["properties"][
+        "board"
+    ]["anyOf"][0]["properties"]["cards"]["additionalProperties"]
+
+    assert card_schema["properties"]["priority"]["enum"] == ["low", "medium", "high"]
+    assert "dueDate" in card_schema["properties"]
+    # Strict mode requires every property to be listed as required.
+    assert set(card_schema["required"]) == {
+        "id",
+        "title",
+        "details",
+        "priority",
+        "dueDate",
+    }
+
+
+def test_parse_structured_response_preserves_card_priority_and_due_date() -> None:
+    parsed = parse_structured_chat_response(
+        '{"reply":"Updated.","board":{"columns":[{"id":"c","title":"Col","cardIds":["x"]}],'
+        '"cards":{"x":{"id":"x","title":"T","details":"D","priority":"high","dueDate":"2026-09-01"}}}}'
+    )
+
+    assert parsed.board is not None
+    assert parsed.board.cards["x"].priority == "high"
+    assert parsed.board.cards["x"].dueDate == "2026-09-01"
+
+
 def test_parse_structured_chat_response_accepts_reply_only_shape() -> None:
     parsed = parse_structured_chat_response('{"reply":"Done.","board":null}')
 

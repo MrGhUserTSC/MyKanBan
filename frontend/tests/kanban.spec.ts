@@ -87,9 +87,7 @@ test("rejects invalid credentials", async ({ page }) => {
   await page.goto("/");
   await page.getByLabel("Password").fill("wrong-password");
   await page.getByRole("button", { name: /^sign in$/i }).click();
-  await expect(
-    page.getByText(/use username "user" and password "password"/i)
-  ).toBeVisible();
+  await expect(page.getByText(/invalid credentials/i)).toBeVisible();
 });
 
 test("logs in and loads the kanban board", async ({ page }) => {
@@ -205,6 +203,45 @@ test("logs out back to the sign-in screen", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: /log in to open your kanban board/i })
   ).toBeVisible();
+});
+
+test("registers a new account and opens its own board", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: /need an account/i }).click();
+  await expect(
+    page.getByRole("heading", { name: /create your account/i })
+  ).toBeVisible();
+
+  const username = `e2e-${Date.now()}`;
+  await page.getByLabel("Username").fill(username);
+  await page.getByLabel("Password").fill("playwright-pass");
+  await page.getByRole("button", { name: /^create account$/i }).click();
+
+  await expect(page.getByRole("heading", { name: "Kanban Studio" })).toBeVisible();
+  // A brand new account starts with a single empty board.
+  await expect(page.getByLabel(/select board/i)).toHaveValue(/\d+/);
+  await expect(page.locator('[data-testid^="column-"]')).toHaveCount(3);
+});
+
+test("creates and switches between multiple boards", async ({ page }) => {
+  await page.goto("/");
+  await login(page);
+  await resetBoard(page);
+
+  const boardName = `Sprint ${Date.now()}`;
+  await page.getByRole("button", { name: /new board/i }).click();
+  await page.getByLabel(/new board name/i).fill(boardName);
+  await page.getByRole("button", { name: /^create$/i }).click();
+
+  // The new board becomes active and starts empty (3 default columns, no cards).
+  const select = page.getByLabel(/select board/i);
+  await expect(select.locator("option", { hasText: boardName })).toHaveCount(1);
+  await expect(page.locator('[data-testid^="column-"]')).toHaveCount(3);
+  await expect(page.getByText("Align roadmap themes")).toHaveCount(0);
+
+  // Switch back to the seeded roadmap board and confirm its cards return.
+  await select.selectOption({ label: "Product Roadmap" });
+  await expect(page.getByText("Align roadmap themes")).toBeVisible();
 });
 
 test("shows AI chat replies in the sidebar", async ({ page }) => {

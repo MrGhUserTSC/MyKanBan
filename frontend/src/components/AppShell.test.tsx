@@ -6,6 +6,24 @@ import { initialData } from "@/lib/kanban";
 
 const fetchMock = vi.fn();
 
+const boardSummary = {
+  id: 1,
+  name: "Product Roadmap",
+  position: 0,
+  created_at: "2026-01-01T00:00:00+00:00",
+  updated_at: "2026-01-01T00:00:00+00:00",
+};
+
+const ok = (json: unknown) => ({ ok: true, json: async () => json });
+const fail = (json: unknown = null) => ({ ok: false, json: async () => json });
+
+// Convenience: queue the three fetches an authenticated session bootstraps with.
+const queueAuthenticatedBootstrap = () => {
+  fetchMock.mockResolvedValueOnce(ok({ username: "user" })); // GET /api/session
+  fetchMock.mockResolvedValueOnce(ok([boardSummary])); // GET /api/boards
+  fetchMock.mockResolvedValueOnce(ok(initialData)); // GET /api/boards/1
+};
+
 describe("AppShell", () => {
   beforeEach(() => {
     vi.stubGlobal("fetch", fetchMock);
@@ -17,7 +35,7 @@ describe("AppShell", () => {
   });
 
   it("shows the login screen when no active session exists", async () => {
-    fetchMock.mockResolvedValueOnce({ ok: false });
+    fetchMock.mockResolvedValueOnce(fail());
 
     render(<AppShell />);
 
@@ -29,8 +47,8 @@ describe("AppShell", () => {
   });
 
   it("shows an error when login fails", async () => {
-    fetchMock.mockResolvedValueOnce({ ok: false });
-    fetchMock.mockResolvedValueOnce({ ok: false });
+    fetchMock.mockResolvedValueOnce(fail()); // session
+    fetchMock.mockResolvedValueOnce(fail({ detail: "Invalid credentials." })); // login
 
     render(<AppShell />);
 
@@ -40,20 +58,15 @@ describe("AppShell", () => {
     await userEvent.click(screen.getByRole("button", { name: /^sign in$/i }));
 
     expect(
-      await screen.findByText(/use username "user" and password "password"/i)
+      await screen.findByText(/invalid credentials/i)
     ).toBeInTheDocument();
   });
 
   it("renders the board after a successful login", async () => {
-    fetchMock.mockResolvedValueOnce({ ok: false });
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ username: "user" }),
-    });
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => initialData,
-    });
+    fetchMock.mockResolvedValueOnce(fail()); // session
+    fetchMock.mockResolvedValueOnce(ok({ username: "user" })); // login
+    fetchMock.mockResolvedValueOnce(ok([boardSummary])); // boards list
+    fetchMock.mockResolvedValueOnce(ok(initialData)); // board content
 
     render(<AppShell />);
 
@@ -70,16 +83,68 @@ describe("AppShell", () => {
     ).toBeInTheDocument();
   });
 
+  it("lets a new user switch to the registration form", async () => {
+    fetchMock.mockResolvedValueOnce(fail()); // session
+
+    render(<AppShell />);
+
+    await screen.findByRole("heading", {
+      name: /log in to open your kanban board/i,
+    });
+    await userEvent.click(
+      screen.getByRole("button", { name: /need an account/i })
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: /create your account/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /^create account$/i })
+    ).toBeInTheDocument();
+  });
+
+  it("registers a new account and loads its board", async () => {
+    fetchMock.mockResolvedValueOnce(fail()); // session
+    fetchMock.mockResolvedValueOnce(ok({ username: "alice" })); // register
+    fetchMock.mockResolvedValueOnce(ok([{ ...boardSummary, name: "My Board" }])); // boards
+    fetchMock.mockResolvedValueOnce(ok(initialData)); // board content
+
+    render(<AppShell />);
+
+    await screen.findByRole("heading", {
+      name: /log in to open your kanban board/i,
+    });
+    await userEvent.click(
+      screen.getByRole("button", { name: /need an account/i })
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: /^create account$/i })
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Kanban Studio" })
+    ).toBeInTheDocument();
+  });
+
+  it("shows the board switcher with the active board selected", async () => {
+    queueAuthenticatedBootstrap();
+
+    render(<AppShell />);
+
+    await screen.findByRole("heading", { name: "Kanban Studio" });
+
+    const select = (await screen.findByLabelText(
+      /select board/i
+    )) as HTMLSelectElement;
+    expect(select.value).toBe("1");
+    expect(
+      screen.getByRole("option", { name: "Product Roadmap" })
+    ).toBeInTheDocument();
+  });
+
   it("logs out back to the sign-in screen", async () => {
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ username: "user" }),
-    });
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => initialData,
-    });
-    fetchMock.mockResolvedValueOnce({ ok: true });
+    queueAuthenticatedBootstrap();
+    fetchMock.mockResolvedValueOnce(ok(null)); // logout
 
     render(<AppShell />);
 
@@ -95,35 +160,10 @@ describe("AppShell", () => {
     });
   });
 
-  it("shows a board load message for an active session", async () => {
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ username: "user" }),
-    });
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => initialData,
-    });
-
-    render(<AppShell />);
-
-    expect(
-      await screen.findByRole("heading", { name: "Kanban Studio" })
-    ).toBeInTheDocument();
-  });
-
   it("shows assistant replies and updates the board from chat", async () => {
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ username: "user" }),
-    });
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => initialData,
-    });
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
+    queueAuthenticatedBootstrap();
+    fetchMock.mockResolvedValueOnce(
+      ok({
         reply: "I added the card.",
         updated: true,
         board: {
@@ -144,8 +184,8 @@ describe("AppShell", () => {
             },
           },
         },
-      }),
-    });
+      })
+    );
 
     render(<AppShell />);
 

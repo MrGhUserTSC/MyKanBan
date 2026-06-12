@@ -5,24 +5,36 @@ import re
 from secrets import token_urlsafe
 
 import httpx
-from fastapi import FastAPI, HTTPException, Request, Response, status
+from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.database import (
-    MVP_USERNAME,
+    create_board,
+    create_user,
+    delete_board,
+    get_board,
     get_board_for_username,
+    get_default_board_id,
     initialize_database,
+    list_boards,
+    rename_board,
+    save_board,
     save_board_for_username,
+    verify_credentials,
 )
 from app.models import (
     AiChatRequest,
     AiChatResponse,
+    BoardSummary,
     CardPayload,
+    CreateBoardPayload,
     AiChatStructuredResponse,
     BoardPayload,
     LoginPayload,
     OpenRouterTestResponse,
+    RegisterPayload,
+    RenameBoardPayload,
     SessionResponse,
 )
 from app.openrouter import (
@@ -41,7 +53,6 @@ INDEX_FILE = STATIC_DIR / "index.html"
 FRONTEND_INDEX_FILE = ACTIVE_FRONTEND_DIR / "index.html"
 DB_PATH = Path(os.getenv("PM_DB_PATH", str(PROJECT_ROOT / "backend" / "data" / "pm.db")))
 SESSION_COOKIE_NAME = "pm_session"
-MVP_PASSWORD = "password"
 PLAYWRIGHT_AI_MODEL = "stub-playwright"
 
 logger = logging.getLogger(__name__)
@@ -75,6 +86,29 @@ def get_current_user(request: Request) -> str | None:
 
     sessions: dict[str, str] = request.app.state.sessions
     return sessions.get(session_id)
+
+
+def require_user(request: Request) -> str:
+    username = get_current_user(request)
+    if not username:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required.",
+        )
+    return username
+
+
+def issue_session(app: FastAPI, response: Response, username: str) -> None:
+    session_id = token_urlsafe(32)
+    app.state.sessions[session_id] = username
+    response.set_cookie(
+        key=SESSION_COOKIE_NAME,
+        value=session_id,
+        httponly=True,
+        samesite="lax",
+        secure=False,
+        path="/",
+    )
 
 
 def build_stub_ai_response(
@@ -150,35 +184,32 @@ def create_app(db_path: Path = DB_PATH) -> FastAPI:
         return {"status": "ok", "service": "pm-backend"}
 
     @app.get("/api/session", response_model=SessionResponse)
-    def read_session(request: Request) -> SessionResponse:
-        username = get_current_user(request)
-        if not username:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Authentication required.",
-            )
-
+    def read_session(username: str = Depends(require_user)) -> SessionResponse:
         return SessionResponse(username=username)
+
+    @app.post("/api/register", response_model=SessionResponse, status_code=status.HTTP_201_CREATED)
+    def register(payload: RegisterPayload, response: Response) -> SessionResponse:
+        try:
+            create_user(app.state.db_path, payload.username, payload.password)
+        except ValueError as error:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(error),
+            ) from error
+
+        issue_session(app, response, payload.username.strip())
+        return SessionResponse(username=payload.username.strip())
 
     @app.post("/api/login", response_model=SessionResponse)
     def login(payload: LoginPayload, response: Response) -> SessionResponse:
-        if payload.username != MVP_USERNAME or payload.password != MVP_PASSWORD:
+        if not verify_credentials(app.state.db_path, payload.username, payload.password):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid credentials.",
             )
 
-        session_id = token_urlsafe(32)
-        app.state.sessions[session_id] = payload.username
-        response.set_cookie(
-            key=SESSION_COOKIE_NAME,
-            value=session_id,
-            httponly=True,
-            samesite="lax",
-            secure=False,
-            path="/",
-        )
-        return SessionResponse(username=payload.username)
+        issue_session(app, response, payload.username.strip())
+        return SessionResponse(username=payload.username.strip())
 
     @app.post("/api/logout")
     def logout(request: Request, response: Response) -> Response:
@@ -192,26 +223,14 @@ def create_app(db_path: Path = DB_PATH) -> FastAPI:
         return response
 
     @app.get("/api/board", response_model=BoardPayload)
-    def read_board(request: Request) -> BoardPayload:
-        username = get_current_user(request)
-        if not username:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Authentication required.",
-            )
-
+    def read_board(username: str = Depends(require_user)) -> BoardPayload:
         board = get_board_for_username(app.state.db_path, username)
         return BoardPayload.model_validate(board)
 
     @app.put("/api/board", response_model=BoardPayload)
-    def update_board(request: Request, payload: BoardPayload) -> BoardPayload:
-        username = get_current_user(request)
-        if not username:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Authentication required.",
-            )
-
+    def update_board(
+        payload: BoardPayload, username: str = Depends(require_user)
+    ) -> BoardPayload:
         board = save_board_for_username(
             app.state.db_path,
             username,
@@ -219,15 +238,67 @@ def create_app(db_path: Path = DB_PATH) -> FastAPI:
         )
         return BoardPayload.model_validate(board)
 
-    @app.post("/api/ai/test", response_model=OpenRouterTestResponse)
-    async def test_openrouter(request: Request) -> OpenRouterTestResponse:
-        username = get_current_user(request)
-        if not username:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Authentication required.",
-            )
+    @app.get("/api/boards", response_model=list[BoardSummary])
+    def get_boards(username: str = Depends(require_user)) -> list[BoardSummary]:
+        return [BoardSummary.model_validate(meta) for meta in list_boards(app.state.db_path, username)]
 
+    @app.post("/api/boards", response_model=BoardSummary, status_code=status.HTTP_201_CREATED)
+    def add_board(
+        payload: CreateBoardPayload, username: str = Depends(require_user)
+    ) -> BoardSummary:
+        try:
+            meta = create_board(app.state.db_path, username, payload.name)
+        except ValueError as error:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, str(error)) from error
+        return BoardSummary.model_validate(meta)
+
+    @app.get("/api/boards/{board_id}", response_model=BoardPayload)
+    def read_board_by_id(
+        board_id: int, username: str = Depends(require_user)
+    ) -> BoardPayload:
+        try:
+            board = get_board(app.state.db_path, username, board_id)
+        except LookupError as error:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Board not found.") from error
+        return BoardPayload.model_validate(board)
+
+    @app.put("/api/boards/{board_id}", response_model=BoardPayload)
+    def update_board_by_id(
+        board_id: int, payload: BoardPayload, username: str = Depends(require_user)
+    ) -> BoardPayload:
+        try:
+            board = save_board(app.state.db_path, username, board_id, payload.model_dump())
+        except LookupError as error:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Board not found.") from error
+        return BoardPayload.model_validate(board)
+
+    @app.patch("/api/boards/{board_id}", response_model=BoardSummary)
+    def rename_board_by_id(
+        board_id: int, payload: RenameBoardPayload, username: str = Depends(require_user)
+    ) -> BoardSummary:
+        try:
+            meta = rename_board(app.state.db_path, username, board_id, payload.name)
+        except LookupError as error:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Board not found.") from error
+        except ValueError as error:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, str(error)) from error
+        return BoardSummary.model_validate(meta)
+
+    @app.delete("/api/boards/{board_id}", status_code=status.HTTP_204_NO_CONTENT)
+    def remove_board(
+        board_id: int, response: Response, username: str = Depends(require_user)
+    ) -> Response:
+        try:
+            delete_board(app.state.db_path, username, board_id)
+        except LookupError as error:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Board not found.") from error
+        except ValueError as error:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, str(error)) from error
+        response.status_code = status.HTTP_204_NO_CONTENT
+        return response
+
+    @app.post("/api/ai/test", response_model=OpenRouterTestResponse)
+    async def test_openrouter(username: str = Depends(require_user)) -> OpenRouterTestResponse:
         prompt = "What is 2+2? Reply with only the answer."
         try:
             result = await request_openrouter_chat(prompt)
@@ -249,24 +320,21 @@ def create_app(db_path: Path = DB_PATH) -> FastAPI:
         )
 
     @app.post("/api/ai/chat", response_model=AiChatResponse)
-    async def ai_chat(request: Request, payload: AiChatRequest) -> AiChatResponse:
-        username = get_current_user(request)
-        if not username:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Authentication required.",
-            )
-
+    async def ai_chat(
+        request: Request, payload: AiChatRequest, username: str = Depends(require_user)
+    ) -> AiChatResponse:
         session_id = request.cookies.get(SESSION_COOKIE_NAME)
-        if not session_id:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Authentication required.",
+        try:
+            board_id = (
+                payload.board_id
+                if payload.board_id is not None
+                else get_default_board_id(app.state.db_path, username)
             )
-
-        board = BoardPayload.model_validate(
-            get_board_for_username(app.state.db_path, username)
-        )
+            board = BoardPayload.model_validate(
+                get_board(app.state.db_path, username, board_id)
+            )
+        except LookupError as error:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Board not found.") from error
         history: list[dict[str, str]] = app.state.chat_history.setdefault(session_id, [])
 
         if os.getenv("PM_AI_MODE") == "stub":
@@ -304,9 +372,10 @@ def create_app(db_path: Path = DB_PATH) -> FastAPI:
                     sorted(dropped_cards),
                 )
 
-            saved_board = save_board_for_username(
+            saved_board = save_board(
                 app.state.db_path,
                 username,
+                board_id,
                 next_board.model_dump(),
             )
             next_board = BoardPayload.model_validate(saved_board)

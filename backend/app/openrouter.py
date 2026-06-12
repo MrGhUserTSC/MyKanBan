@@ -64,6 +64,8 @@ def build_chat_messages(
             "and ordering unless the user explicitly asks to change that specific item. "
             "Do not drop unrelated columns or cards. "
             "Do not rename ids. "
+            "Each card has a priority (low, medium, or high) and an optional dueDate (YYYY-MM-DD or empty). "
+            "Preserve each card's existing priority and dueDate unless the user asks to change them. "
             "Do not create a smaller replacement board unless the user explicitly asks to remove those items."
         ),
     }
@@ -132,8 +134,22 @@ def build_structured_chat_payload(
                                                     "id": {"type": "string"},
                                                     "title": {"type": "string"},
                                                     "details": {"type": "string"},
+                                                    "priority": {
+                                                        "type": "string",
+                                                        "enum": ["low", "medium", "high"],
+                                                    },
+                                                    "dueDate": {
+                                                        "type": "string",
+                                                        "description": "Due date as YYYY-MM-DD, or an empty string when there is none.",
+                                                    },
                                                 },
-                                                "required": ["id", "title", "details"],
+                                                "required": [
+                                                    "id",
+                                                    "title",
+                                                    "details",
+                                                    "priority",
+                                                    "dueDate",
+                                                ],
                                                 "additionalProperties": False,
                                             },
                                         },

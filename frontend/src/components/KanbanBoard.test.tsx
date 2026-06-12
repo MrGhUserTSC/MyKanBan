@@ -56,4 +56,57 @@ describe("KanbanBoard", () => {
 
     expect(screen.getByText("Edited roadmap")).toBeInTheDocument();
   });
+
+  it("shows a default priority badge on every card", () => {
+    render(<KanbanBoard />);
+    const card = screen.getByTestId("card-card-1");
+
+    // initialData cards carry no priority, so they fall back to Medium.
+    expect(within(card).getByLabelText(/priority: medium/i)).toBeInTheDocument();
+  });
+
+  it("adds a card with a chosen priority and due date", async () => {
+    render(<KanbanBoard />);
+    const column = getFirstColumn();
+    await userEvent.click(
+      within(column).getByRole("button", { name: /add a card/i })
+    );
+
+    await userEvent.type(
+      within(column).getByPlaceholderText(/card title/i),
+      "High-priority work"
+    );
+    await userEvent.selectOptions(
+      within(column).getByLabelText(/card priority/i),
+      "high"
+    );
+    await userEvent.type(
+      within(column).getByLabelText(/card due date/i),
+      "2026-09-01"
+    );
+    await userEvent.click(
+      within(column).getByRole("button", { name: /add card/i })
+    );
+
+    const newCard = within(column).getByText("High-priority work").closest("article");
+    expect(newCard).not.toBeNull();
+    expect(within(newCard as HTMLElement).getByLabelText(/priority: high/i)).toBeInTheDocument();
+    expect(within(newCard as HTMLElement).getByText(/due/i)).toBeInTheDocument();
+  });
+
+  it("edits a card's priority", async () => {
+    render(<KanbanBoard />);
+    const card = screen.getByTestId("card-card-1");
+
+    await userEvent.click(
+      within(card).getByRole("button", { name: /edit align roadmap themes/i })
+    );
+    await userEvent.selectOptions(
+      within(card).getByLabelText(/edit priority for align roadmap themes/i),
+      "low"
+    );
+    await userEvent.click(within(card).getByRole("button", { name: /^save$/i }));
+
+    expect(within(card).getByLabelText(/priority: low/i)).toBeInTheDocument();
+  });
 });

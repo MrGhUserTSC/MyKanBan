@@ -1,4 +1,5 @@
-import type { Card } from "@/lib/kanban";
+import { cardPriority, type Card } from "@/lib/kanban";
+import { DueDateChip, PriorityBadge } from "@/components/CardBadges";
 
 type KanbanCardPreviewProps = {
   card: Card;
@@ -20,6 +21,10 @@ export const KanbanCardPreview = ({ card }: KanbanCardPreviewProps) => (
         <p className="mt-2 overflow-hidden break-words text-sm leading-6 text-[var(--gray-text)]">
           {card.details}
         </p>
+        <div className="mt-3 flex flex-wrap items-center gap-1.5">
+          <PriorityBadge priority={cardPriority(card)} />
+          {card.dueDate ? <DueDateChip dueDate={card.dueDate} /> : null}
+        </div>
       </div>
     </div>
   </article>
